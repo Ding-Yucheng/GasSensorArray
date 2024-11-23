@@ -61,16 +61,16 @@ flt.value(0)
 
 sensor_data = []
 
-for i in range(45):
+for i in range(9):
     sensor_data.append(0) # Init
 
 def read_data():
     cs.value(0)
-    while spi.read(1)[0] == 16:
-        pass
-    data = spi.read(2) # MSB
+    data = spi.read(3)
+    print(data[0], data[1], data[2])
     cs.value(1)
-    merged_data = (data[0] << 8) | data[1]
+    merged_data = ((data[0] & 0x3) << 14) | (data[1] << 6) | (data[2] >> 2)
+    time.sleep_ms(1)
     return merged_data
 
 def select(pins, index):
@@ -79,7 +79,7 @@ def select(pins, index):
         pins[i].value(bit)
 
 def scan():
-    for i in range(15):
+    for i in range(3):
         select(TopCtrl, i)
         for j in range(3):
             select(BotCtrl, i - i % 3 + j)
@@ -131,19 +131,19 @@ while True:
 while True:
     request = conn.recv(512)
     if len(request) > 0:
-        print("Received:%s"%request)
-        if request.decode('utf-8') == 'heating_off':
-            heat.value(0)
+        #print("Received:%s"%request)
+        if request.decode('utf-8') == 'filter_off':
+            flt.value(0)
         elif request.decode('utf-8') == 'data1':  
             scan()
             list_to_str()
-            heat.value(1)
-            print(sarr)
+            flt.value(1)
+            #print(sarr)
             conn.send(sarr.encode('utf-8'))
         elif request.decode('utf-8') == 'data2':
             scan()
             list_to_str()
-            print(sarr)
+            #print(sarr)
             conn.send(sarr.encode('utf-8'))  
         else:
             time.sleep_us(100)
