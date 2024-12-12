@@ -21,8 +21,12 @@ station = network.WLAN(network.STA_IF)
 station.active(True)
 
 while station.isconnected() == False:
-    station.connect(ssid, password)
-    pass
+    try:
+        station.connect(ssid, password)
+        pass
+    except:
+        print('Connecting')
+        time.sleep(1)
 
 print('Connection successful')
 print(station.ifconfig())
@@ -50,7 +54,7 @@ BotCtrl = [
     Pin(15, Pin.OUT)
 ]
 
-spi = SoftSPI(baudrate=100000, polarity=0, phase=0, sck=Pin(22), mosi=Pin(4), miso=Pin(21))
+spi = SoftSPI(baudrate=115200, polarity=0, phase=0, sck=Pin(22), mosi=Pin(4), miso=Pin(21))
 cs = Pin(19, Pin.OUT)
 cs.value(1)
 
@@ -61,16 +65,14 @@ flt.value(0)
 
 sensor_data = []
 
-for i in range(9):
+for i in range(45):
     sensor_data.append(0) # Init
 
 def read_data():
     cs.value(0)
     data = spi.read(3)
-    print(data[0], data[1], data[2])
     cs.value(1)
-    merged_data = ((data[0] & 0x3) << 14) | (data[1] << 6) | (data[2] >> 2)
-    time.sleep_ms(1)
+    merged_data = (((data[0] << 16)| (data[1] << 8) | data[2]) >> 2)&0xFFFF
     return merged_data
 
 def select(pins, index):
@@ -79,15 +81,24 @@ def select(pins, index):
         pins[i].value(bit)
 
 def scan():
-    for i in range(3):
+    
+    for i in range(15):
         select(TopCtrl, i)
         for j in range(3):
-            select(BotCtrl, i - i % 3 + j)
-            for t in range(3):
-                read_data()
-                time.sleep_ms(1)
+            select(BotCtrl, i - i % 3  + j)
+            time.sleep_ms(5)
+            read_data()
             sensor_data[i * 3 + (j % 3)] = read_data()
-
+    """
+    for i in range(5):
+        select(TopCtrl, 3*i)
+        select(BotCtrl, 3*i)
+        time.sleep_ms(5)
+        for t in range(3):
+            read_data()
+            time.sleep_ms(3)
+        sensor_data[i] = read_data()
+    """
 def list_to_str():
     global sarr
     sarr = 'str'
@@ -96,56 +107,24 @@ def list_to_str():
         sarr += '.'
     sarr += 'end'
 
-hst = 0.005 # Half of scanning time (in seconds)
 print('\r\n\r\nSnake Gas Sensor Demo.\r\n')
-heat.value(1)
-'''
-time.sleep(10)
-while True:
-    flt.value(1)
-    time.sleep(5-hst)
-    scan()
-    print(sensor_data)
-    flt.value(0)
-    for i in range(4):
-        scan()
-        print(sensor_data)
-    time.sleep(5-hst)
-'''
-'''
-for i in range(1000):
-    start_time = utime.ticks_us()
-    scan()
-    print(sensor_data)
-    end_time = utime.ticks_us()
-    #print("Scanning Time: {} us".format(end_time-start_time))
-'''
-'''
-select(TopCtrl, 1)
-select(BotCtrl, 1)
-while True:
-    print(read_data())
-    time.sleep_ms(10)
-'''
+heat.value(0)
 
 while True:
     request = conn.recv(512)
     if len(request) > 0:
         #print("Received:%s"%request)
         if request.decode('utf-8') == 'filter_off':
-            flt.value(0)
-        elif request.decode('utf-8') == 'data1':  
-            scan()
-            list_to_str()
             flt.value(1)
-            #print(sarr)
-            conn.send(sarr.encode('utf-8'))
-        elif request.decode('utf-8') == 'data2':
+            print("flt off")
+        elif request.decode('utf-8') == 'filter_on':  
+            flt.value(0)
+            print("flt on")
+        elif request.decode('utf-8') == 'data':
             scan()
             list_to_str()
-            #print(sarr)
+            print(sarr)
             conn.send(sarr.encode('utf-8'))  
         else:
             time.sleep_us(100)
         continue
-

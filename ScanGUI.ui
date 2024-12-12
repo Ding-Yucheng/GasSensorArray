@@ -238,10 +238,62 @@ p, li { white-space: pre-wrap; }
    <property name="geometry">
     <rect>
      <x>870</x>
-     <y>150</y>
-     <width>750</width>
-     <height>750</height>
+     <y>350</y>
+     <width>500</width>
+     <height>500</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="GraphicsLayoutWidget" name="IMG7" native="true">
+   <property name="geometry">
+    <rect>
+     <x>870</x>
+     <y>10</y>
+     <width>850</width>
+     <height>150</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="GraphicsLayoutWidget" name="IMG8" native="true">
+   <property name="geometry">
+    <rect>
+     <x>870</x>
+     <y>170</y>
+     <width>850</width>
+     <height>150</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>1460</x>
+     <y>370</y>
+     <width>141</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <family>Arial</family>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Pre-heating</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="preheating">
+   <property name="geometry">
+    <rect>
+     <x>1410</x>
+     <y>360</y>
+     <width>30</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
    </property>
   </widget>
   <zorder>scan</zorder>
@@ -261,6 +313,10 @@ p, li { white-space: pre-wrap; }
   <zorder>C3</zorder>
   <zorder>C4</zorder>
   <zorder>IMG6</zorder>
+  <zorder>IMG7</zorder>
+  <zorder>IMG8</zorder>
+  <zorder>label</zorder>
+  <zorder>preheating</zorder>
  </widget>
  <customwidgets>
   <customwidget>

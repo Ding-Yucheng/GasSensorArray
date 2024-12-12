@@ -7,6 +7,13 @@ from PyQt5.QtWidgets import QMainWindow, QTextEdit
 import numpy as np
 import pyqtgraph as pg
 
+
+
+
+global pixel_number, one_cycle
+pixel_number = 45
+one_cycle = 20 # seconds
+
 class EmittingStream(QObject):
     textWritten = pyqtSignal(str)
 
@@ -58,8 +65,7 @@ class Stats(QMainWindow):
         self.esp_port = 54080
 
         # Initialize data
-        self.data = np.arange(9).reshape(3, 3)
-        self.linedata = np.zeros((9, 1000))
+        self.linedata = np.zeros((pixel_number, 1000))
         self.x = np.arange(1000)
 
         # Events
@@ -81,31 +87,22 @@ class Stats(QMainWindow):
         self.plot.setBackground('w')
         self.plotline.setBackground('w')
         pg.setConfigOption('background', 'w')  # 设置背景为白色
-        pg.setConfigOption('foreground', 'k') 
+        pg.setConfigOption('foreground', 'k')
 
-        self.img_item = pg.ImageItem()
-        plot_instance = self.plot.addPlot()
-        plot_instance.addItem(self.img_item)
-        self.img_item.setLookupTable(self.colormap.getLookupTable())
-        self.img_item.setImage(self.data)
-        plot_instance.hideAxis('bottom')
-        plot_instance.hideAxis('left')
-        
 
         self.lines = []
 
-        self.img_itemline = pg.ImageItem()
         plot_instance1 = self.plotline.addPlot()
         plot_instance1.showGrid(x=True, y=True)
         plot_instance1.enableAutoRange()
 
-        for i in range(9):
+        for i in range(pixel_number):
             pen = pg.mkPen(color=pg.intColor(i, 9), width=2)  # 不同颜色
             line = plot_instance1.plot(self.x, self.linedata[i], pen=pen, name=f"Line {i+1}")
             self.lines.append(line)
 
         self.show()
-        self.csv_file = "calibrate_data/data_pixel1.csv"
+        self.csv_file = "calibrate_data/data_pixel1" +str(time.time()) +".csv"
         self.init_csv()
 
     @pyqtSlot(str)
@@ -136,14 +133,12 @@ class Stats(QMainWindow):
     
     @pyqtSlot(np.ndarray)
     def Handle_Update_Image(self, new_data):
-        matrices = new_data.reshape(3, 3)
-        self.img_item.setImage(matrices)
         # 滚动数据，移除最旧的数据点
         self.linedata = np.roll(self.linedata, -1, axis=1)
         self.linedata[:, -1] = new_data  # 将新数据插入到最后一列
 
         # 更新每条折线的数据
-        for i in range(9):
+        for i in range(pixel_number):
             self.lines[i].setData(self.x, self.linedata[i])
         
         self.show()
@@ -154,7 +149,7 @@ class Stats(QMainWindow):
         with open(self.csv_file, mode='w', newline='') as file:
             writer = csv.writer(file)
             # 写入表头，分别对应 Line1, Line2, ..., Line9
-            header = [f"pixel{i+1}" for i in range(9)]
+            header = [f"pixel{i+1}" for i in range(5)]
             writer.writerow(header)
 
     def append_to_csv(self, new_data):
@@ -192,31 +187,28 @@ class ScanThread(QThread):
             try:
                 msg = 'filter_off'
                 self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                st = time.time()
-                while time.time() - st < 4.95:
-                    msg = 'data2'
-                    self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                    rmsg = self.wifi.socket_tcp.recv(8192)
-                    str_data = (rmsg.decode('utf-8'))[3:-4]
-                    raw_data_after = np.array(list(map(int, str_data.split('.'))))
-                    self.update_data.emit(raw_data_after)
-                    time.sleep(0.01)
-                msg = 'data1'
-                self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                rmsg = self.wifi.socket_tcp.recv(8192)
-                str_data = (rmsg.decode('utf-8'))[3:-4]
-                raw_data_before = np.array(list(map(int, str_data.split('.'))))
-                self.update_data.emit(raw_data_before)
                 time.sleep(0.01)
                 st = time.time()
-                while time.time() - st < 4.95:
-                    msg = 'data2'
+                while self.is_running and time.time() - st < one_cycle / 2:
+                    msg = 'data'
                     self.wifi.socket_tcp.send(msg.encode('utf-8'))
                     rmsg = self.wifi.socket_tcp.recv(8192)
                     str_data = (rmsg.decode('utf-8'))[3:-4]
-                    raw_data_after = np.array(list(map(int, str_data.split('.'))))
-                    self.update_data.emit(raw_data_after)
-                    time.sleep(0.1)
+                    raw_data = np.array(list(map(int, str_data.split('.'))))
+                    self.update_data.emit(raw_data)
+                    time.sleep(0.01)
+                msg = 'filter_on'
+                self.wifi.socket_tcp.send(msg.encode('utf-8'))
+                time.sleep(0.01)
+                st = time.time()
+                while self.is_running and time.time() - st < one_cycle / 2:
+                    msg = 'data'
+                    self.wifi.socket_tcp.send(msg.encode('utf-8'))
+                    rmsg = self.wifi.socket_tcp.recv(8192)
+                    str_data = (rmsg.decode('utf-8'))[3:-4]
+                    raw_data = np.array(list(map(int, str_data.split('.'))))
+                    self.update_data.emit(raw_data)
+                    time.sleep(0.01)
             except Exception as e:
                 print("Thread Error:", e)
                 break
