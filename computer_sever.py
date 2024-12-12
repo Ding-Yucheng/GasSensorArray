@@ -1,6 +1,7 @@
 import socket
 import sys
-import time, csv
+import time
+import csv
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMainWindow, QTextEdit
@@ -41,9 +42,15 @@ class WifiConnectThread(QThread):
                 self.connection_success.emit()
                 break
             except socket.timeout:
+                self.socket_tcp.close()
+                self.socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket_tcp.settimeout(5)
                 self.connection_failed.emit("Connection timed out. Retrying...")
                 time.sleep(1)
             except socket.error as e:
+                self.socket_tcp.close()
+                self.socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.socket_tcp.settimeout(5)
                 self.connection_failed.emit(f"Socket error: {e}. Retrying...")
                 time.sleep(1)
                 
@@ -66,16 +73,21 @@ class Stats(QMainWindow):
 
         # Initialize data
         self.data = np.arange(45).reshape(5, 3, 3)
-        self.linedata = np.zeros((pixel_number, 1000))
+        self.rawdata = np.zeros((pixel_number, 1000))
         self.x = np.arange(1000)
         self.diffdata = np.zeros((pixel_number, 1000))
+        # Parameters
+        self.linear_k = [1, 1, 1, 1, 1]
+        self.linear_c = [0, 0, 0, 0, 0]
+        self.i = 1
+        self.j = 1
 
         # Events
         self.ui.wifi_init.clicked.connect(self.Wifi_Init)
         self.ui.scan.clicked.connect(self.Scan)
         self.ui.stop.clicked.connect(self.Stop)
 
-        self.preheat_status = self.ui.preheating
+        self.preheat_status_label = self.ui.preheating
 
         # Concentration Display
         self.texts = [self.ui.C1, self.ui.C2, self.ui.C3, self.ui.C4, self.ui.C5]
@@ -95,16 +107,16 @@ class Stats(QMainWindow):
         self.data_indices = range(5)
         self.img_items = []
 
-        self.plotline = self.ui.IMG7
+        self.plotraw = self.ui.IMG7
         self.plotdiff = self.ui.IMG8
-        self.plotline.setBackground('w')
+        self.plotraw.setBackground('w')
         self.plotdiff.setBackground('w')
         pg.setConfigOption('background', 'w')  # 设置背景为白色
         pg.setConfigOption('foreground', 'k')
 
-        self.lines = []
+        self.raws = []
         self.diffs = []
-        plot_instance1 = self.plotline.addPlot()
+        plot_instance1 = self.plotraw.addPlot()
         plot_instance2 = self.plotdiff.addPlot()
         plot_instance1.showGrid(x=True, y=True)
         plot_instance2.showGrid(x=True, y=True)
@@ -113,20 +125,16 @@ class Stats(QMainWindow):
 
         for i in range(pixel_number):
             pen = pg.mkPen(color=pg.intColor(i, 9), width=2)  # 不同颜色
-            line = plot_instance1.plot(self.x, self.linedata[i], pen=pen, name=f"Line {i+1}")
+            raw = plot_instance1.plot(self.x, self.rawdata[i], pen=pen, name=f"raw {i+1}")
             diff = plot_instance2.plot(self.x, self.diffdata[i], pen=pen, name=f"Diff {i+1}")
-            self.lines.append(line)
+            self.raws.append(raw)
             self.diffs.append(diff)
 
         self.show()
         self.csv_file = "calibrate_data/data_pixel1" +str(time.time()) +".csv"
         self.init_csv()
 
-        # Parameters
-        self.linear_k = [1, 1, 1, 1, 1]
-        self.linear_c = [0, 0, 0, 0, 0]
-        self.i = 1
-        self.j = 1
+
         self.sensor_positions = np.array([[0, 0],[-1, 1],[-1, -1],[1, -1],[1, 1]])
         self.weights = []
         self.concentrations = np.zeros(5)
@@ -176,12 +184,6 @@ class Stats(QMainWindow):
         self.outputTextEdit.setTextCursor(cursor)
         self.outputTextEdit.ensureCursorVisible()
 
-    def Create_Scan_Thread(self):
-        self.scan_thread = ScanThread(self.ui, self.wifi_thread)
-        self.scan_thread.stats = self
-        self.scan_thread.update_data.connect(self.Handle_Update_Image)
-        print("Scan thread ready")
-
     def Wifi_Init(self):
         self.wifi_thread = WifiConnectThread(self.esp_ip, self.esp_port)
         self.wifi_thread.connection_success.connect(self.on_connection_success)
@@ -196,22 +198,20 @@ class Stats(QMainWindow):
     
     @pyqtSlot(np.ndarray)
     def Handle_Update_Image(self, new_data):
-        # 滚动数据，移除最旧的数据点
-        self.linedata = np.roll(self.linedata, -1, axis=1)
+        self.rawdata = np.roll(self.rawdata, -1, axis=1)
         self.diffdata = np.roll(self.diffdata, -1, axis=1)
-        self.linedata[:, -1] = new_data  # 将新数据插入到最后一列
+        self.rawdata[:, -1] = new_data
 
-        # 更新每条折线的数据
-        if time.time() - self.startpoint > one_cycle:
-            self.preheat_status.setStyleSheet("background-color: green; border - radius: 10px;")
+        if time.time() - self.startpoint > one_cycle * 1.5:
+            self.preheat_status_label.setStyleSheet("background-color: green; border - radius: 20px;")
             for i in range(pixel_number):
-                window_data = self.linedata[i][-data_per_cycle:]
+                window_data = self.rawdata[i][-data_per_cycle:]
                 self.diffdata[i][-1] = np.max(window_data) - np.min(window_data)
-                self.lines[i].setData(self.x, self.linedata[i])
+                self.raws[i].setData(self.x, self.rawdata[i])
                 self.diffs[i].setData(self.x, self.diffdata[i])
 
             self.show()
-            self.append_to_csv(new_data)
+            self.append_to_csv(np.append(new_data, self.diffdata[:,-1]))
 
             matrices = np.array(self.diffdata[:, -1]).reshape(5, 3, 3)
             for img_item, index in zip(self.img_items, self.data_indices):
@@ -233,14 +233,13 @@ class Stats(QMainWindow):
         estimated_y = np.sum(self.sensor_positions[:, 1] * weighted_concentrations) / np.sum(weighted_concentrations)
 
         return estimated_x, estimated_y
- 
+
     def Scan(self):
         self.startpoint = time.time()
-        self.preheat_status.setStyleSheet("background-color: red; border - radius: 10px;")
-        try:
-            self.Create_Scan_Thread()
-        except:
-            print("Thread Error.")
+        self.preheat_status_label.setStyleSheet("background-color: red; border - radius: 10px;")
+        self.scan_thread = ScanThread(self.ui, self.wifi_thread)
+        self.scan_thread.stats = self
+        self.scan_thread.update_data.connect(self.Handle_Update_Image)
         if not self.scan_thread.isRunning():
             print("Start Scanning...")
             self.scan_thread.start()
@@ -250,15 +249,12 @@ class Stats(QMainWindow):
         print("Scanning Stop.")
 
     def init_csv(self):
-        """初始化 CSV 文件，写入表头"""
         with open(self.csv_file, mode='w', newline='') as file:
             writer = csv.writer(file)
-            # 写入表头，分别对应 Line1, Line2, ..., Line9
-            header = [f"pixel{i+1}" for i in range(pixel_number)]
+            header = [f"pixel_raw{i+1}" for i in range(pixel_number)]+[f"pixel_diff{i+1}" for i in range(pixel_number)]
             writer.writerow(header)
 
     def append_to_csv(self, new_data):
-        """将新数据追加到 CSV 文件中"""
         with open(self.csv_file, mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(new_data)
@@ -273,42 +269,37 @@ class ScanThread(QThread):
         self.stats = None
         self.wifi = wifi
 
+    def _collect_data(self, filter_status):
+        if filter_status:
+            msg = 'filter_on'
+        else:
+            msg = 'filter_off'
+        self.wifi.socket_tcp.send(msg.encode('utf-8'))
+        time.sleep(0.01)
+        st = time.time()
+        counting = 0
+        while self.is_running and time.time() - st < one_cycle / 2:
+            counting += 1
+            msg = 'data'
+            self.wifi.socket_tcp.send(msg.encode('utf-8'))
+            rmsg = self.wifi.socket_tcp.recv(8192)
+            str_data = (rmsg.decode('utf-8'))[3:-4]
+            raw_data = np.array(list(map(int, str_data.split('.'))))
+            self.update_data.emit(raw_data)
+            time.sleep(0.01)
+        return counting
+
     def run(self):
         self.is_running = True
         while self.is_running:
             try:
-                msg = 'filter_off'
-                self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                time.sleep(0.01)
-                st = time.time()
-                counting = 0
-                while self.is_running and time.time() - st < one_cycle / 2:
-                    counting += 1
-                    msg = 'data'
-                    self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                    rmsg = self.wifi.socket_tcp.recv(8192)
-                    str_data = (rmsg.decode('utf-8'))[3:-4]
-                    raw_data = np.array(list(map(int, str_data.split('.'))))
-                    self.update_data.emit(raw_data)
-                    time.sleep(0.01)
-                msg = 'filter_on'
-                self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                time.sleep(0.01)
-                st = time.time()
-                while self.is_running and time.time() - st < one_cycle / 2:
-                    counting += 1
-                    msg = 'data'
-                    self.wifi.socket_tcp.send(msg.encode('utf-8'))
-                    rmsg = self.wifi.socket_tcp.recv(8192)
-                    str_data = (rmsg.decode('utf-8'))[3:-4]
-                    raw_data = np.array(list(map(int, str_data.split('.'))))
-                    self.update_data.emit(raw_data)
-                    time.sleep(0.01)
+                count_off = self._collect_data(False)
+                count_on = self._collect_data(True)
                 global data_per_cycle
-                data_per_cycle = counting
+                data_per_cycle = count_off + count_on
             except Exception as e:
+                self.is_running = False
                 print("Thread Error:", e)
-                break
 
     def stop(self):
         self.is_running = False
