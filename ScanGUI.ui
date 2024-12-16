@@ -243,6 +243,22 @@ p, li { white-space: pre-wrap; }
      <height>500</height>
     </rect>
    </property>
+   <widget class="QLabel" name="Direction">
+    <property name="geometry">
+     <rect>
+      <x>300</x>
+      <y>10</y>
+      <width>191</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="autoFillBackground">
+     <bool>false</bool>
+    </property>
+    <property name="text">
+     <string>TextLabel</string>
+    </property>
+   </widget>
   </widget>
   <widget class="GraphicsLayoutWidget" name="IMG7" native="true">
    <property name="geometry">

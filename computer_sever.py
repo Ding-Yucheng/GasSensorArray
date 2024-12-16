@@ -72,7 +72,7 @@ class Stats(QMainWindow):
         self.esp_port = 54080
 
         # Initialize data
-        self.data = np.arange(45).reshape(5, 3, 3)
+        self.data = np.arange(0, 0.9, 0.02).reshape(5, 3, 3)
         self.rawdata = np.zeros((pixel_number, 1000))
         self.x = np.arange(1000)
         self.diffdata = np.zeros((pixel_number, 1000))
@@ -91,9 +91,10 @@ class Stats(QMainWindow):
 
         # Concentration Display
         self.texts = [self.ui.C1, self.ui.C2, self.ui.C3, self.ui.C4, self.ui.C5]
+        self.dir_test = self.ui.Direction
         for cc in self.texts:
             cc.setText("Concentration: 0 ppm")
-        
+        self.dir_test.setText("Source Direction: °")
         # Network
         self.addr = (self.esp_ip, self.esp_port)
         self.socket_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -101,7 +102,6 @@ class Stats(QMainWindow):
         # Form Greyscale Color Map
         colors = [(i, i / 2, 0) for i in range(256)]
         self.colormap = pg.ColorMap(pos=np.linspace(0.0, 1.0, 256), color=colors)
-
         # Figures Initialization
         self.plots = [self.ui.IMG1, self.ui.IMG2, self.ui.IMG3, self.ui.IMG4, self.ui.IMG5]
         self.data_indices = range(5)
@@ -152,7 +152,8 @@ class Stats(QMainWindow):
             img_item = pg.ImageItem()
             plot_instance = plot.addPlot()
             plot_instance.addItem(img_item)
-            img_item.setLookupTable(self.colormap.getLookupTable())
+            img_item.setColorMap(self.colormap)
+            img_item.setLevels([0, 1])
             img_item.setImage(self.data[index])
             plot_instance.hideAxis('bottom')
             plot_instance.hideAxis('left')
@@ -168,7 +169,7 @@ class Stats(QMainWindow):
             circle = QtWidgets.QGraphicsEllipseItem(-radius, -radius, radius*2, radius*2)
             circle.setPen(pg.mkPen('gray', style=QtCore.Qt.DashLine))
             plot_instance.addItem(circle)
-        self.img_source_dir = pg.ArrowItem(pos=(0,0),angle=0, tipAngle=30, headLen=10, tailLen=0, pen={'color': 'b', 'width': 2})
+        self.img_source_dir = pg.ArrowItem(pos=(0,0),angle=0, tipAngle=30, headLen=30, tailLen=0, pen={'color': 'b', 'width': 2})
         self.img_source_len = pg.PlotDataItem()
         self.img_source_len.setPen(width=4, color=(0, 0, 155))
         plot_instance.addItem(self.img_source_len)
@@ -206,10 +207,9 @@ class Stats(QMainWindow):
             self.preheat_status_label.setStyleSheet("background-color: green; border - radius: 20px;")
             for i in range(pixel_number):
                 window_data = self.rawdata[i][-data_per_cycle:]
-                self.diffdata[i][-1] = np.max(window_data) - np.min(window_data)
+                self.diffdata[i][-1] = (np.max(window_data) - np.min(window_data))/np.max(window_data)
                 self.raws[i].setData(self.x, self.rawdata[i])
                 self.diffs[i].setData(self.x, self.diffdata[i])
-
             self.show()
             self.append_to_csv(np.append(new_data, self.diffdata[:,-1]))
 
@@ -220,6 +220,7 @@ class Stats(QMainWindow):
                 self.texts[index].setText("Concentration: " + str(self.concentrations[index])+" ppm")
             x,y = self.estimate_source_location()
             line = QtCore.QLineF(0, 0, x, y)
+            self.dir_test.setText("Source Direction: " + str((line.angle() + 270) % 360) + "°")
             self.img_source_dir.setPos(x,y)
             self.img_source_dir.setStyle(angle = line.angle()+180)
             self.img_source_len.setData([0,x],[0,y])
