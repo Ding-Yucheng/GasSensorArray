@@ -243,22 +243,6 @@ p, li { white-space: pre-wrap; }
      <height>500</height>
     </rect>
    </property>
-   <widget class="QLabel" name="Direction">
-    <property name="geometry">
-     <rect>
-      <x>300</x>
-      <y>10</y>
-      <width>191</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="autoFillBackground">
-     <bool>false</bool>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-   </widget>
   </widget>
   <widget class="GraphicsLayoutWidget" name="IMG7" native="true">
    <property name="geometry">
@@ -312,6 +296,22 @@ p, li { white-space: pre-wrap; }
     <string/>
    </property>
   </widget>
+  <widget class="QLabel" name="Direction">
+   <property name="geometry">
+    <rect>
+     <x>1170</x>
+     <y>330</y>
+     <width>191</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="autoFillBackground">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>TextLabel</string>
+   </property>
+  </widget>
   <zorder>scan</zorder>
   <zorder>wifi_init</zorder>
   <zorder>label_22</zorder>
@@ -333,6 +333,7 @@ p, li { white-space: pre-wrap; }
   <zorder>IMG8</zorder>
   <zorder>label</zorder>
   <zorder>preheating</zorder>
+  <zorder>Direction</zorder>
  </widget>
  <customwidgets>
   <customwidget>
